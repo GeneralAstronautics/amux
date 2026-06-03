@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "head_sha": "ae7660f0c6968c30f915fe61f5f78fcee8a3f606",
-  "workflow_run_id": "26864785419",
+  "head_sha": "cf37c33a12b54c8357e6e1773cc7e54a3c0b8dee",
+  "workflow_run_id": "26867282053",
   "workflow_run_attempt": "1",
   "runner_os": "Linux",
   "go_version": "go1.25.10",
