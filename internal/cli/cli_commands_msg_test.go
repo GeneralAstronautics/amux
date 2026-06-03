@@ -186,7 +186,7 @@ func TestMsgCLICommandHandler(t *testing.T) {
 		{
 			name:       "subcommand help",
 			args:       []string{"msg", "send", "--help"},
-			wantStdout: "usage: amux msg send [--from <pane>] --to <pane[,pane...]> [--subject text] [--topic name] [--group name] [--metadata json] [--reply-to msg-id] (--body text|--body-file path|stdin) [--format json]\n",
+			wantStdout: msgSendUsage + "\n",
 		},
 		{
 			name:       "reply help",

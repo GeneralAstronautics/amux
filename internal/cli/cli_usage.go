@@ -17,7 +17,7 @@ const (
 	metaUsage      = "usage: amux meta <set|get|rm> ..."
 	mcpServerUsage = "usage: amux mcp-server"
 	msgUsage       = "usage: amux msg <send|reply|inbox|list|drain-status|read|ack|thread> ..."
-	msgSendUsage   = "usage: amux msg send [--from <pane>] --to <pane[,pane...]> [--subject text] [--topic name] [--group name] [--metadata json] [--reply-to msg-id] (--body text|--body-file path|stdin) [--format json]"
+	msgSendUsage   = "usage: amux msg send [--from <pane>] --to <pane[,pane...]> [--subject text] [--topic name] [--group name] [--metadata json] [--reply-to msg-id] (--body text|--body-file path|-|stdin) [--wait-read|--wait-ack] [--timeout duration] [--format json]"
 	msgReplyUsage  = "usage: amux msg reply <msg-id> [--from <pane>] [--to <pane[,pane...]>] [--subject text] [--topic name] [--group name] [--metadata json] [--ack ok|error|seen] [--ack-note text] (--body text|--body-file path|stdin) [--format json]"
 	msgInboxUsage  = `usage: amux msg inbox [pane] [--unread] [--format json]
        amux msg list [pane] [--unread] [--format json]
