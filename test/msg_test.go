@@ -154,6 +154,13 @@ func TestMsgCLISendReadsStdinAndBodyFile(t *testing.T) {
 	if fileRead != "From: pane-1 (1)\n\nfile body\n" {
 		t.Fatalf("body-file message read output = %q, want sender header and file body", fileRead)
 	}
+
+	dashOut := runHarnessCLIWithInput(t, h, "dash stdin body\nsecond line\n", "msg", "send", "--from", "pane-1", "--to", "pane-2", "--subject", "dash", "--body-file", "-", "--format", "json")
+	dashID := parseMsgCLISendID(t, dashOut)
+	dashRead := h.runCmd("msg", "read", dashID, "--for", "pane-2")
+	if dashRead != "From: pane-1 (1)\n\ndash stdin body\nsecond line\n" {
+		t.Fatalf("body-file dash message read output = %q, want sender header and stdin body", dashRead)
+	}
 }
 
 func TestMsgCLIThreadDumpsConversation(t *testing.T) {

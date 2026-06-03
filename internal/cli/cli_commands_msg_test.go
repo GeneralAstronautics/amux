@@ -47,6 +47,12 @@ func TestPrepareMsgCLIArgs(t *testing.T) {
 			want: []string{"send", "--to", "pane-1", "--body", "file body\n"},
 		},
 		{
+			name:  "body file dash becomes stdin body flag",
+			stdin: strings.NewReader("stdin body\n"),
+			args:  []string{"send", "--to", "pane-1", "--body-file", "-"},
+			want:  []string{"send", "--to", "pane-1", "--body", "stdin body\n"},
+		},
+		{
 			name:  "stdin becomes body flag",
 			stdin: strings.NewReader("stdin body"),
 			args:  []string{"send", "--to", "pane-1"},
@@ -61,6 +67,12 @@ func TestPrepareMsgCLIArgs(t *testing.T) {
 			name: "reply body file becomes body flag",
 			args: []string{"reply", "msg-000001", "--body-file", bodyPath},
 			want: []string{"reply", "msg-000001", "--body", "file body\n"},
+		},
+		{
+			name:  "reply body file dash becomes stdin body flag",
+			stdin: strings.NewReader("stdin body\n"),
+			args:  []string{"reply", "msg-000001", "--body-file", "-"},
+			want:  []string{"reply", "msg-000001", "--body", "stdin body\n"},
 		},
 		{
 			name:  "reply stdin becomes body flag",
