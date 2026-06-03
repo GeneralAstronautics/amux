@@ -88,9 +88,9 @@ func prepareMsgCLIArgs(stdin io.Reader, args []string) ([]string, error) {
 				return nil, fmt.Errorf("--body, --body-file, and stdin are mutually exclusive")
 			}
 			if value == "-" {
-				data, err := io.ReadAll(stdin)
+				data, err := readMsgCLIStdin(stdin)
 				if err != nil {
-					return nil, fmt.Errorf("reading stdin: %w", err)
+					return nil, err
 				}
 				bodyFileSet = true
 				stdinConsumed = true
@@ -114,9 +114,9 @@ func prepareMsgCLIArgs(stdin io.Reader, args []string) ([]string, error) {
 		if bodySet || bodyFileSet {
 			return nil, fmt.Errorf("--body, --body-file, and stdin are mutually exclusive")
 		}
-		data, err := io.ReadAll(stdin)
+		data, err := readMsgCLIStdin(stdin)
 		if err != nil {
-			return nil, fmt.Errorf("reading stdin: %w", err)
+			return nil, err
 		}
 		out = append(out, "--body", string(data))
 		return out, nil
@@ -125,6 +125,14 @@ func prepareMsgCLIArgs(stdin io.Reader, args []string) ([]string, error) {
 		out = append(out, "--body", string(bodyFileData))
 	}
 	return out, nil
+}
+
+func readMsgCLIStdin(stdin io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(stdin)
+	if err != nil {
+		return nil, fmt.Errorf("reading stdin: %w", err)
+	}
+	return data, nil
 }
 
 func msgCLIRequiredValue(args []string, i int, name string) (string, int, error) {
