@@ -15,19 +15,17 @@ import (
 )
 
 const (
-	msgUsage                 = "usage: msg <send|reply|inbox|list|drain-status|read|ack|thread> ..."
-	msgSendUsage             = "usage: msg send [--from pane] --to pane[,pane...] [--subject text] [--topic name] [--group name] [--metadata json] [--reply-to msg-id] --body text [--wait-read|--wait-ack] [--timeout duration] [--format json]"
-	msgReplyUsage            = "usage: msg reply <msg-id> [--from pane] [--to pane[,pane...]] [--subject text] [--topic name] [--group name] [--metadata json] [--ack status] [--ack-note text] --body text [--format json]"
-	msgDeliverUsage          = "usage: msg deliver <payload-json> [--format json]"
-	msgInboxUsage            = "usage: msg inbox|list [pane] [--unread] [--format json]"
-	msgDrainStatusUsage      = "usage: msg drain-status [pane] [--format json]"
-	msgReadUsage             = "usage: msg read <msg-id> [--for pane] [--peek] [--format json]"
-	msgAckUsage              = "usage: msg ack <msg-id> [--for pane] [--status ok|error|seen] [--note text] [--format json]"
-	msgThreadUsage           = "usage: msg thread <topic|msg-id> [--format json]"
-	msgDrainLatestLimit      = 5
-	msgSubjectBriefLimit     = 120
-	msgConfirmDefaultTimeout = 30 * time.Second
-	msgConfirmPollInterval   = 10 * time.Millisecond
+	msgUsage             = "usage: msg <send|reply|inbox|list|drain-status|read|ack|thread> ..."
+	msgSendUsage         = "usage: msg send [--from pane] --to pane[,pane...] [--subject text] [--topic name] [--group name] [--metadata json] [--reply-to msg-id] --body text [--wait-read|--wait-ack] [--timeout duration] [--format json]"
+	msgReplyUsage        = "usage: msg reply <msg-id> [--from pane] [--to pane[,pane...]] [--subject text] [--topic name] [--group name] [--metadata json] [--ack status] [--ack-note text] --body text [--format json]"
+	msgDeliverUsage      = "usage: msg deliver <payload-json> [--format json]"
+	msgInboxUsage        = "usage: msg inbox|list [pane] [--unread] [--format json]"
+	msgDrainStatusUsage  = "usage: msg drain-status [pane] [--format json]"
+	msgReadUsage         = "usage: msg read <msg-id> [--for pane] [--peek] [--format json]"
+	msgAckUsage          = "usage: msg ack <msg-id> [--for pane] [--status ok|error|seen] [--note text] [--format json]"
+	msgThreadUsage       = "usage: msg thread <topic|msg-id> [--format json]"
+	msgDrainLatestLimit  = 5
+	msgSubjectBriefLimit = 120
 )
 
 type msgFormat string
@@ -35,14 +33,6 @@ type msgFormat string
 const (
 	msgFormatText msgFormat = "text"
 	msgFormatJSON msgFormat = "json"
-)
-
-type msgConfirmStatus string
-
-const (
-	msgConfirmNone msgConfirmStatus = ""
-	msgConfirmRead msgConfirmStatus = "read"
-	msgConfirmAck  msgConfirmStatus = "ack"
 )
 
 type msgSendOptions struct {
@@ -190,18 +180,6 @@ type msgThreadMessageOutput struct {
 type msgAckOutput struct {
 	MessageID mailbox.MessageID     `json:"id"`
 	Delivery  mailbox.DeliveryState `json:"delivery"`
-}
-
-type msgConfirmOutput struct {
-	Status     string             `json:"status"`
-	Satisfied  bool               `json:"satisfied"`
-	Pending    []string           `json:"pending"`
-	Deliveries []msgSummaryOutput `json:"deliveries"`
-}
-
-type msgSendConfirmOutput struct {
-	msgSendOutput
-	Confirm msgConfirmOutput `json:"confirm"`
 }
 
 type msgRecipientTarget struct {
@@ -798,71 +776,6 @@ func runMsgSendCommand(ctx *CommandContext, opts msgSendOptions) (string, error)
 	return formatMsgSendOutput(msg, opts.format)
 }
 
-func waitForMsgConfirmation(ctx *CommandContext, id mailbox.MessageID, recipients []mailbox.PaneAddress, status msgConfirmStatus, timeout time.Duration) (msgConfirmOutput, error) {
-	deadline := time.Now().Add(timeout)
-	for {
-		confirm, err := queryMsgConfirmation(ctx, id, recipients, status)
-		if err != nil {
-			return confirm, err
-		}
-		if confirm.Satisfied {
-			return confirm, nil
-		}
-		if !time.Now().Before(deadline) {
-			return confirm, fmt.Errorf("timed out waiting for %s from %s\n%s", status, strings.Join(confirm.Pending, ","), formatMsgConfirmText(confirm))
-		}
-
-		sleep := time.Until(deadline)
-		if sleep > msgConfirmPollInterval {
-			sleep = msgConfirmPollInterval
-		}
-		select {
-		case <-ctx.context().Done():
-			return confirm, ctx.context().Err()
-		case <-time.After(sleep):
-		}
-	}
-}
-
-func queryMsgConfirmation(ctx *CommandContext, id mailbox.MessageID, recipients []mailbox.PaneAddress, status msgConfirmStatus) (msgConfirmOutput, error) {
-	confirm, err := enqueueSessionQueryOnState(ctx.context(), ctx.Sess, func(sess *Session) (msgConfirmOutput, error) {
-		summaries := make([]mailbox.DeliverySummary, 0, len(recipients))
-		pending := make([]string, 0)
-		store := sess.ensureMailbox()
-		for _, recipient := range recipients {
-			summary, err := store.DeliverySummary(id, recipient.ID)
-			if err != nil {
-				return msgConfirmOutput{}, err
-			}
-			summaries = append(summaries, summary)
-			if !msgDeliverySatisfies(summary, status) {
-				pending = append(pending, recipient.Name)
-			}
-		}
-		return msgConfirmOutput{
-			Status:     string(status),
-			Satisfied:  len(pending) == 0,
-			Pending:    pending,
-			Deliveries: summariesOutput(summaries),
-		}, nil
-	})
-	if err != nil {
-		return msgConfirmOutput{}, err
-	}
-	return confirm, nil
-}
-
-func msgDeliverySatisfies(summary mailbox.DeliverySummary, status msgConfirmStatus) bool {
-	switch status {
-	case msgConfirmRead:
-		return !summary.ReadAt.IsZero()
-	case msgConfirmAck:
-		return !summary.AckedAt.IsZero()
-	default:
-		return true
-	}
-}
-
 func runMsgReplyCommand(ctx *CommandContext, opts msgReplyOptions) (string, error) {
 	var plan msgReplyPlan
 	res := ctx.Sess.enqueueCommandMutationContext(ctx.context(), func(mctx *MutationContext) commandMutationResult {
@@ -1362,16 +1275,6 @@ func formatMsgSendOutput(msg mailbox.Message, format msgFormat) (string, error) 
 	return fmt.Sprintf("Sent %s to %s\n", msg.ID, joinPaneNames(msg.Recipients)), nil
 }
 
-func formatMsgSendConfirmOutput(msg mailbox.Message, confirm msgConfirmOutput, format msgFormat) (string, error) {
-	if format == msgFormatJSON {
-		return encodeMsgJSON(msgSendConfirmOutput{
-			msgSendOutput: sendOutputForMessage(msg),
-			Confirm:       confirm,
-		})
-	}
-	return fmt.Sprintf("Sent %s to %s\n%s", msg.ID, joinPaneNames(msg.Recipients), formatMsgConfirmText(confirm)), nil
-}
-
 func sendOutputForMessage(msg mailbox.Message) msgSendOutput {
 	return msgSendOutput{
 		ID:         msg.ID,
@@ -1386,42 +1289,6 @@ func sendOutputForMessage(msg mailbox.Message) msgSendOutput {
 		BodySize:   messageOutputBodySize(msg),
 		PartCount:  len(msg.Parts),
 	}
-}
-
-func formatMsgConfirmText(confirm msgConfirmOutput) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "recipient status read_at acked_at ack_status\n")
-	for _, delivery := range confirm.Deliveries {
-		status := msgConfirmDeliveryStatus(delivery)
-		fmt.Fprintf(&b, "%s %s %s %s %s\n",
-			delivery.Recipient.Name,
-			status,
-			msgConfirmTimeOrDash(delivery.ReadAt),
-			msgConfirmTimeOrDash(delivery.AckedAt),
-			msgConfirmValueOrDash(delivery.AckStatus))
-	}
-	return b.String()
-}
-
-func msgConfirmDeliveryStatus(delivery msgSummaryOutput) string {
-	if delivery.AckedAt != "" {
-		return "ack"
-	}
-	if delivery.ReadAt != "" {
-		return "read"
-	}
-	return "pending"
-}
-
-func msgConfirmTimeOrDash(value string) string {
-	return msgConfirmValueOrDash(value)
-}
-
-func msgConfirmValueOrDash(value string) string {
-	if value == "" {
-		return "-"
-	}
-	return value
 }
 
 func summariesOutput(summaries []mailbox.DeliverySummary) []msgSummaryOutput {
