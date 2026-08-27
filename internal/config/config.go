@@ -72,8 +72,10 @@ func AccentColorLetter(hex string) (byte, bool) {
 	return l, ok
 }
 
-// Named hex color constants from the Catppuccin Mocha palette.
-const (
+// Named hex UI colors. These default to the Catppuccin Mocha palette and are
+// replaced at client startup by ApplyPalette when [theme] preset/colors are
+// configured. See theme.go.
+var (
 	DimColorHex  = "6c7086" // Overlay 0 — inactive/dim borders
 	TextColorHex = "cdd6f4" // Text foreground
 	Surface0Hex  = "313244" // Surface 0 — status bar background
@@ -115,6 +117,29 @@ const (
 type ThemeConfig struct {
 	StatusStyle string  `toml:"status_style"`
 	Icons       *string `toml:"icons"`
+
+	// Palette preset ("default" | "soft") and per-role overrides.
+	Preset string      `toml:"preset"`
+	Colors ThemeColors `toml:"colors"`
+
+	// Done-flash: pulse a pane's border/title when its agent goes busy -> idle
+	// while the pane is not focused. Defaults on.
+	DoneFlash           *bool   `toml:"done_flash"`
+	DoneFlashColor      string  `toml:"done_flash_color"`
+	DoneFlashBg         *string `toml:"done_flash_bg"`
+	DoneFlashDurationMs *int    `toml:"done_flash_duration_ms"`
+	DoneFlashPulses     *int    `toml:"done_flash_pulses"`
+
+	// Needs-input glow: steady tint on a pane that finished (went idle) and
+	// has not been focused or typed into since. Defaults on.
+	NeedsInputGlow  *bool   `toml:"needs_input_glow"`
+	NeedsInputColor string  `toml:"needs_input_color"`
+	NeedsInputBg    *string `toml:"needs_input_bg"`
+
+	// Alternating tints: checkerboard background across adjacent panes.
+	// Defaults on.
+	AlternateTints  *bool  `toml:"alternate_tints"`
+	AlternateTintBg string `toml:"alternate_tint_bg"`
 }
 
 type RemoteConfig struct {
@@ -216,6 +241,15 @@ func parseConfig(data []byte) (*Config, error) {
 		return nil, err
 	}
 	if _, err := ResolveThemeIcons(cfg.Theme.Icons); err != nil {
+		return nil, err
+	}
+	if _, err := ResolvePalette(cfg.Theme.Preset, cfg.Theme.Colors); err != nil {
+		return nil, err
+	}
+	if _, err := ResolveAttention(cfg.Theme); err != nil {
+		return nil, err
+	}
+	if _, err := ResolveAlternateTint(cfg.Theme); err != nil {
 		return nil, err
 	}
 	if err := ValidateRemoteHosts(cfg.Remote.Hosts); err != nil {
