@@ -327,6 +327,37 @@ No, and it doesn't aim to. amux implements what matters for human+agent pairing:
 All commands accept `-s <session>` to target a specific session. Panes are referenced by name (`pane-1`) or numeric ID (`1`). Prefix matches are also supported.
 The public CLI keeps one command path per concept: target sessions with `-s`, create panes with `spawn`, inspect history with `log`, and reorder layouts with `move` or `swap`.
 
+### Ultra layout
+
+`amux layout ultra` turns the window into a fixed-slot grid (default **3 columns × 2 rows = 6 cells**).
+The top-left cell is reserved for the window's **lead** pane (`amux lead <pane>`) and appears on every
+page; the other five cells are numbered **agent slots**:
+
+- **Stable slots.** A pane keeps its slot until it exits. An exited pane leaves an *empty* cell (drawn
+  dim with its slot number); the next spawned pane takes the lowest empty slot. Slots are assigned in
+  pane-ID order when you first switch to ultra.
+- **Pages.** More agents than slots → extra pages of 5 slots each, with the lead on every page. Page
+  with `amux layout page next|prev|N`, `Ctrl-a >` / `Ctrl-a <`, or `amux layout ultra --page N`. The
+  global bar shows `ultra 1/2`. Hidden panes keep running and stay fully addressable (`capture`,
+  `send-keys`, `wait`, `events`, `kill`, `zoom`, `focus` — focusing or zooming a hidden pane jumps to
+  its page). `amux capture` marks them with `"hidden": true` and every agent pane carries `"slot": N`.
+- **Auto-promotion.** When a pane on a hidden page goes idle (the same edge as the `idle` event), it is
+  bumped onto the visible page: into an empty visible slot if there is one, otherwise swapping with the
+  least-recently-active *busy* visible pane. The focused pane and the lead are never demoted. Disable
+  with `--no-auto-promote` or `auto_promote = false` in config.
+- `spawn`, `kill`, `swap <a> <b>`, `lead`, `zoom`, `focus`, windows and remote mirrors work as usual.
+  Free-form tree edits (`move`, `rotate`, `resize-pane`, `equalize`, border drags) are no-ops or refused
+  while ultra is on — run `amux layout off` to get a normal split tree back (lead anchored left, agents
+  in a grid on the right).
+- The grid survives `amux reload-server` (it is part of the checkpoint).
+
+```toml
+[layout.ultra]
+rows = 2            # 1..8
+cols = 3            # 1..8  (rows*cols >= 2); 3x2 = lead + 5 agent slots per page
+auto_promote = true # bump idle hidden panes onto the visible page
+```
+
 ### Session
 
 | Command | Description |
@@ -358,6 +389,9 @@ The public CLI keeps one command path per concept: target sessions with `-s`, cr
 | `amux respawn <pane>` | Restart a local pane with a fresh shell in the same slot |
 | `amux copy-mode [pane] [--wait ui=copy-mode-shown] [--timeout <duration>]` | Enter copy/scroll mode |
 | `amux lead [pane]` / `amux lead --clear` | Set or clear the lead pane |
+| `amux layout ultra [--page N] [--rows R] [--cols C]` | Switch the window to the **ultra** fixed-slot grid (`ultrade` is an alias); see [Ultra layout](#ultra-layout) |
+| `amux layout off` / `amux layout toggle` / `amux layout status` | Leave the ultra grid (all panes back in a normal split), toggle it, or print the current layout |
+| `amux layout page next\|prev\|N` | Page through ultra agent slots when there are more agents than cells |
 | `amux meta set <pane> key=value...` | Set pane metadata |
 | `amux meta get <pane> [key]` | Read pane metadata |
 | `amux meta rm <pane> key...` | Remove pane metadata keys |
@@ -479,6 +513,8 @@ Default prefix: `Ctrl-a`.
 | `Ctrl-a q` | Show pane labels for quick jump |
 | `Ctrl-a ?` | Toggle keybinding help bar |
 | `Ctrl-a 1-9` | Select window by number |
+| `Ctrl-a u` | Toggle the ultra grid layout |
+| `Ctrl-a >` / `Ctrl-a <` | Ultra: next/previous page of agent slots |
 | `Ctrl-a r` | Hot reload (re-exec binary) |
 | `Ctrl-a d` | Detach from session |
 | `Ctrl-a Ctrl-a` | Send literal Ctrl-a |
