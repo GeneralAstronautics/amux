@@ -138,6 +138,9 @@ func (w *Window) finishTreeMutationPreservingZoomedPaneSize() {
 // targetPaneID, appending the moved pane to the bottom of that column.
 func (w *Window) MovePaneToColumn(paneID, targetPaneID uint32) error {
 	w.assertOwner("MovePaneToColumn")
+	if w.Ultra != nil {
+		return errUltraLayout
+	}
 	if col := w.leadColumn(); col != nil {
 		if (col.FindPane(paneID) != nil) != (col.FindPane(targetPaneID) != nil) {
 			return fmt.Errorf("cannot move panes across lead column")

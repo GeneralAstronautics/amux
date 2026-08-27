@@ -944,6 +944,18 @@ func buildGlobalBarWindowTabs(windows []WindowInfo) []globalBarWindowTab {
 	return tabs
 }
 
+// globalBarUltraLabel returns the ultra page indicator for the active window
+// ("ultra 1/2"), or "" when the active window is not in ultra layout.
+func globalBarUltraLabel(windows []WindowInfo) string {
+	for _, w := range windows {
+		if !w.IsActive || w.UltraPages == 0 {
+			continue
+		}
+		return "ultra " + strconv.Itoa(w.UltraPage) + "/" + strconv.Itoa(w.UltraPages)
+	}
+	return ""
+}
+
 func globalBarWindowName(window WindowInfo) string {
 	if window.Zoomed {
 		return window.Name + "Z"
@@ -1036,6 +1048,9 @@ func buildPowerlineGlobalBarCells(sessionName string, paneCount int, width int, 
 		cells = appendStyledStatusCells(cells, " ", baseStyle)
 	} else {
 		cells = appendStyledStatusCells(cells, sessionName+" ", baseStyle)
+	}
+	if label := globalBarUltraLabel(windows); label != "" {
+		cells = appendStyledStatusCells(cells, label+" ", focusedStyle)
 	}
 
 	var right []styledStatusCell

@@ -187,13 +187,68 @@ type Host struct {
 	SocketPath string `toml:"socket_path"`
 }
 
+// LayoutConfig holds named-layout settings.
+//
+//	[layout.ultra]
+//	rows = 2            # grid rows (default 2)
+//	cols = 3            # grid columns (default 3) -> 6 cells: lead + 5 agent slots
+//	auto_promote = true # bump idle hidden panes onto the visible page
+type LayoutConfig struct {
+	Ultra UltraConfig `toml:"ultra"`
+}
+
+// UltraConfig configures the ultra fixed-slot grid layout.
+type UltraConfig struct {
+	Rows        *int  `toml:"rows"`
+	Cols        *int  `toml:"cols"`
+	AutoPromote *bool `toml:"auto_promote"`
+}
+
 // Config is the top-level amux configuration.
 type Config struct {
 	ScrollbackLines *int         `toml:"scrollback_lines"`
 	Debug           DebugConfig  `toml:"debug"`
 	Client          ClientConfig `toml:"client"`
 	Theme           ThemeConfig  `toml:"theme"`
+	Layout          LayoutConfig `toml:"layout"`
 	Remote          RemoteConfig `toml:"remote"`
+}
+
+// ResolveUltra validates [layout.ultra] and returns effective rows, cols and
+// auto_promote (defaults 2, 3, true).
+func ResolveUltra(u UltraConfig) (rows, cols int, autoPromote bool, err error) {
+	rows, cols, autoPromote = 2, 3, true
+	if u.Rows != nil {
+		rows = *u.Rows
+	}
+	if u.Cols != nil {
+		cols = *u.Cols
+	}
+	if u.AutoPromote != nil {
+		autoPromote = *u.AutoPromote
+	}
+	if rows < 1 || rows > 8 {
+		return 0, 0, false, fmt.Errorf("layout.ultra.rows must be 1..8")
+	}
+	if cols < 1 || cols > 8 {
+		return 0, 0, false, fmt.Errorf("layout.ultra.cols must be 1..8")
+	}
+	if rows*cols < 2 {
+		return 0, 0, false, fmt.Errorf("layout.ultra needs rows*cols >= 2")
+	}
+	return rows, cols, autoPromote, nil
+}
+
+// EffectiveUltra returns the resolved ultra grid settings.
+func (c *Config) EffectiveUltra() (rows, cols int, autoPromote bool) {
+	if c == nil {
+		return 2, 3, true
+	}
+	rows, cols, autoPromote, err := ResolveUltra(c.Layout.Ultra)
+	if err != nil {
+		return 2, 3, true
+	}
+	return rows, cols, autoPromote
 }
 
 // DefaultPath returns the default config file path.
@@ -288,6 +343,9 @@ func parseConfig(data []byte) (*Config, error) {
 		return nil, err
 	}
 	if _, err := ResolveAlternateTint(cfg.Theme); err != nil {
+		return nil, err
+	}
+	if _, _, _, err := ResolveUltra(cfg.Layout.Ultra); err != nil {
 		return nil, err
 	}
 	if err := ValidateRemoteHosts(cfg.Remote.Hosts); err != nil {

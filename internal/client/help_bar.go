@@ -86,6 +86,11 @@ func buildHelpBar(kb *config.Keybindings) *helpBarState {
 		helpBarItemForKeys(helpBindingDisplay(kb, helpBindingSelector{action: "rename-pane"}), "rename-pane"),
 		helpBarItemForKeys(helpBindingDisplay(kb, helpBindingSelector{action: "last-window"}), "last-win"),
 		helpBarItemForKeys(helpBindingDisplay(kb, helpBindingSelector{action: "toggle-lead"}), "lead"),
+		helpBarItemForKeys(helpBindingDisplay(kb, helpBindingSelector{action: "layout", args: []string{"toggle"}}), "ultra"),
+		helpBarItemForKeys(helpBarJoinParts(
+			helpBindingDisplay(kb, helpBindingSelector{action: "layout", args: []string{"page", "prev"}}),
+			helpBindingDisplay(kb, helpBindingSelector{action: "layout", args: []string{"page", "next"}}),
+		), "page"),
 		helpBarItemForKeys(helpBindingDisplay(kb, helpBindingSelector{action: "detach"}), "detach"),
 		helpBarItemForKeys(helpBindingDisplay(kb, helpBindingSelector{action: "choose-tree"}), "tree"),
 		helpBarItemForKeys(helpBindingDisplay(kb, helpBindingSelector{action: "choose-window"}), "windows"),

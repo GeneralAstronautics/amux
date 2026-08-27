@@ -156,6 +156,7 @@ func (e idleTimeoutEvent) handle(_ context.Context, s *Session) {
 			Host:     host,
 		})
 	}
+	s.ultraPromoteIdle(e.paneID)
 	s.broadcastLayoutNow()
 }
 

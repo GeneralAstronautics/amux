@@ -21,6 +21,7 @@ func (w *Window) FocusPane(p *Pane) {
 			return
 		}
 	}
+	w.ultraShowPane(p.ID)
 	w.setActive(p)
 }
 
@@ -42,7 +43,9 @@ func (w *Window) Focus(direction string) {
 	if direction == "next" {
 		for i, p := range panes {
 			if p.ID == w.ActivePane.ID {
-				w.setActive(panes[(i+1)%len(panes)])
+				next := panes[(i+1)%len(panes)]
+				w.ultraShowPane(next.ID)
+				w.setActive(next)
 				return
 			}
 		}

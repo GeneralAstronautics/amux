@@ -26,6 +26,9 @@ type WindowInfo struct {
 	Zoomed   bool
 	// IsRemoteMirror marks windows created by remote attach-window.
 	IsRemoteMirror bool
+	// Ultra layout page indicator (1-based); UltraPages == 0 means not ultra.
+	UltraPage  int
+	UltraPages int
 }
 
 // RenderStats captures lightweight render counters alongside ANSI output.

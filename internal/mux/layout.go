@@ -30,6 +30,12 @@ type LayoutCell struct {
 	// PaneID is set on client-side rebuilt cells (where Pane is nil).
 	PaneID uint32
 
+	// Slot is the 1-based ultra agent-slot number for this leaf (0 = not an
+	// ultra cell). LeadSlot marks the reserved lead cell. Ultra leaves may have
+	// no pane (empty slot).
+	Slot     int
+	LeadSlot bool
+
 	// Tree structure
 	Parent   *LayoutCell
 	Children []*LayoutCell

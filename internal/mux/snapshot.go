@@ -6,6 +6,7 @@ import "github.com/weill-labs/amux/internal/proto"
 // layout tree, pane snapshots, active pane ID, and zoomed pane ID.
 func (w *Window) snapshotCore() (root proto.CellSnapshot, panes []proto.PaneSnapshot, activePaneID, zoomedPaneID, leadPaneID uint32) {
 	root = snapshotCell(w.Root)
+	ultra := w.snapshotUltra()
 	if w.ActivePane != nil {
 		activePaneID = w.ActivePane.ID
 	}
@@ -18,6 +19,12 @@ func (w *Window) snapshotCore() (root proto.CellSnapshot, panes []proto.PaneSnap
 		}
 		if leadPaneID != 0 && p.ID == leadPaneID {
 			ps.Lead = true
+		}
+		if ultra != nil {
+			if idx := w.Ultra.SlotOf(p.ID); idx >= 0 {
+				ps.Slot = idx + 1
+				ps.Hidden = !w.ultraVisible(p.ID)
+			}
 		}
 		panes = append(panes, ps)
 	}
@@ -37,6 +44,7 @@ func (w *Window) SnapshotLayout(sessionName string) *proto.LayoutSnapshot {
 		LeadPaneID:   leadPaneID,
 		Root:         root,
 		Panes:        panes,
+		Ultra:        w.snapshotUltra(),
 	}
 }
 
@@ -53,7 +61,61 @@ func (w *Window) SnapshotWindow(index int) proto.WindowSnapshot {
 		LeadPaneID:   leadPaneID,
 		Root:         root,
 		Panes:        panes,
+		Ultra:        w.snapshotUltra(),
 	}
+}
+
+func (w *Window) snapshotUltra() *proto.UltraSnapshot {
+	if w.Ultra == nil {
+		return nil
+	}
+	return &proto.UltraSnapshot{
+		Rows:        w.Ultra.Rows,
+		Cols:        w.Ultra.Cols,
+		Page:        w.Ultra.Page,
+		Pages:       w.Ultra.PageCount(),
+		Slots:       w.Ultra.SlotIDs(),
+		AutoPromote: w.Ultra.AutoPromote,
+	}
+}
+
+// restoreUltra rebuilds ultra state from a snapshot. Missing panes leave
+// their slot empty.
+func (w *Window) restoreUltra(us *proto.UltraSnapshot, paneMap map[uint32]*Pane) {
+	if us == nil || ValidateUltraGrid(us.Rows, us.Cols) != nil {
+		return
+	}
+	u := &UltraLayout{Rows: us.Rows, Cols: us.Cols, Page: us.Page, AutoPromote: us.AutoPromote}
+	seen := map[uint32]bool{}
+	for _, id := range us.Slots {
+		var p *Pane
+		if id != 0 {
+			p = paneMap[id]
+			if p != nil {
+				seen[id] = true
+			}
+		}
+		u.Slots = append(u.Slots, p)
+	}
+	w.ultraLead = nil
+	if w.LeadPaneID != 0 {
+		if p := paneMap[w.LeadPaneID]; p != nil {
+			w.ultraLead = p
+			seen[w.LeadPaneID] = true
+		} else {
+			w.LeadPaneID = 0
+		}
+	}
+	// Panes that exist in the window's tree but not in the slot table (should
+	// not happen, but be safe) get slots so nothing is orphaned.
+	for _, p := range w.Panes() {
+		if !seen[p.ID] {
+			u.insert(p)
+		}
+	}
+	w.Ultra = u
+	u.trimEmptyPages()
+	w.rebuildUltraTree()
 }
 
 func (p *Pane) ToSnapshot() proto.PaneSnapshot {
@@ -74,8 +136,10 @@ func (p *Pane) ToSnapshot() proto.PaneSnapshot {
 func snapshotCell(c *LayoutCell) proto.CellSnapshot {
 	cs := proto.CellSnapshot{
 		X: c.X, Y: c.Y, W: c.W, H: c.H,
-		IsLeaf: c.IsLeaf(),
-		Dir:    -1,
+		IsLeaf:   c.IsLeaf(),
+		Dir:      -1,
+		Slot:     c.Slot,
+		LeadSlot: c.LeadSlot,
 	}
 	if !c.IsLeaf() {
 		cs.Dir = int(c.Dir)
@@ -95,9 +159,11 @@ func snapshotCell(c *LayoutCell) proto.CellSnapshot {
 func RebuildLayout(cs proto.CellSnapshot) *LayoutCell {
 	cell := &LayoutCell{
 		X: cs.X, Y: cs.Y, W: cs.W, H: cs.H,
-		isLeaf: cs.IsLeaf,
-		Dir:    SplitDir(cs.Dir),
-		PaneID: cs.PaneID,
+		isLeaf:   cs.IsLeaf,
+		Dir:      SplitDir(cs.Dir),
+		PaneID:   cs.PaneID,
+		Slot:     cs.Slot,
+		LeadSlot: cs.LeadSlot,
 	}
 	for _, childSnap := range cs.Children {
 		child := RebuildLayout(childSnap)
@@ -132,6 +198,7 @@ func RebuildFromSnapshot(snap proto.LayoutSnapshot, paneMap map[uint32]*Pane) *W
 		ZoomedPaneID: snap.ZoomedPaneID,
 		LeadPaneID:   snap.LeadPaneID,
 	}
+	w.restoreUltra(snap.Ultra, paneMap)
 	return w
 }
 
@@ -148,9 +215,11 @@ func CloneLayout(root *LayoutCell) *LayoutCell {
 		W:      root.W,
 		H:      root.H,
 		Dir:    root.Dir,
-		Pane:   root.Pane,
-		PaneID: root.PaneID,
-		isLeaf: root.isLeaf,
+		Pane:     root.Pane,
+		PaneID:   root.PaneID,
+		isLeaf:   root.isLeaf,
+		Slot:     root.Slot,
+		LeadSlot: root.LeadSlot,
 	}
 	for _, child := range root.Children {
 		childClone := CloneLayout(child)
@@ -198,15 +267,18 @@ func RebuildWindowFromSnapshot(ws proto.WindowSnapshot, width, height int, paneM
 		ZoomedPaneID: ws.ZoomedPaneID,
 		LeadPaneID:   ws.LeadPaneID,
 	}
+	w.restoreUltra(ws.Ultra, paneMap)
 	return w
 }
 
 func rebuildCellWithPanes(cs proto.CellSnapshot, paneMap map[uint32]*Pane) *LayoutCell {
 	cell := &LayoutCell{
 		X: cs.X, Y: cs.Y, W: cs.W, H: cs.H,
-		isLeaf: cs.IsLeaf,
-		Dir:    SplitDir(cs.Dir),
-		PaneID: cs.PaneID,
+		isLeaf:   cs.IsLeaf,
+		Dir:      SplitDir(cs.Dir),
+		PaneID:   cs.PaneID,
+		Slot:     cs.Slot,
+		LeadSlot: cs.LeadSlot,
 	}
 	if cs.IsLeaf {
 		if p, ok := paneMap[cs.PaneID]; ok {

@@ -150,6 +150,13 @@ func layoutCLICommands() map[string]commandHandler {
 			}
 			return inv.runSessionCommand(cmdName, cmdArgs)
 		},
+		"layout": func(inv invocation, args []string) int {
+			if hasHelpFlag(args) {
+				fmt.Fprintln(inv.runtime.Stdout, layoutUsage)
+				return 0
+			}
+			return inv.runSessionCommand("layout", args)
+		},
 		"lead": func(inv invocation, args []string) int {
 			cmdName, cmdArgs, err := ParseLeadArgs(args)
 			if err != nil {

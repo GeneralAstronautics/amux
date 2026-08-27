@@ -1113,9 +1113,9 @@ func queryRemoteMirrorTarget(ctx *CommandContext, paneRef string) (remoteMirrorT
 			ref:      *ref,
 		}
 		if w != nil {
-			if cell := w.Root.FindPane(pane.ID); cell != nil {
-				target.cols = cell.W
-				target.rows = mux.PaneContentHeight(cell.H)
+			if cols, rows, ok := w.PaneContentSize(pane.ID); ok {
+				target.cols = cols
+				target.rows = rows
 			}
 		}
 		if target.cols <= 0 || target.rows <= 0 {

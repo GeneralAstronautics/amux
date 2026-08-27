@@ -233,7 +233,7 @@ func windowInfoFromSnapshot(windows []proto.WindowSnapshot, activeWinID uint32) 
 }
 
 func windowInfoFromWindowSnapshot(ws proto.WindowSnapshot, activeWinID uint32) render.WindowInfo {
-	return render.WindowInfo{
+	info := render.WindowInfo{
 		Index:          ws.Index,
 		Name:           ws.Name,
 		IsActive:       ws.ID == activeWinID,
@@ -241,6 +241,11 @@ func windowInfoFromWindowSnapshot(ws proto.WindowSnapshot, activeWinID uint32) r
 		Zoomed:         ws.Zoomed || ws.ZoomedPaneID != 0,
 		IsRemoteMirror: ws.RemoteMirror,
 	}
+	if ws.Ultra != nil {
+		info.UltraPage = ws.Ultra.Page + 1
+		info.UltraPages = ws.Ultra.Pages
+	}
+	return info
 }
 
 func (s *rendererSnapshot) paneLookupFromCaptureSnapshot(paneID uint32) render.PaneData {

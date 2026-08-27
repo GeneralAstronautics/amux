@@ -101,8 +101,8 @@ func (s *Session) collectCheckpointPaneWork() []checkpointPaneWork {
 
 func (s *Session) checkpointPaneDimensions(paneID uint32) (int, int) {
 	for _, w := range s.Windows {
-		if cell := w.Root.FindPane(paneID); cell != nil {
-			return cell.W, mux.PaneContentHeight(cell.H)
+		if cols, rows, ok := w.PaneContentSize(paneID); ok {
+			return cols, rows
 		}
 	}
 	return 0, 0

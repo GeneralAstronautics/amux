@@ -22,6 +22,20 @@ type columnFillColumn struct {
 func (w *Window) PlanColumnFillSpawn() (ColumnFillSpawnPlan, error) {
 	w.assertOwner("PlanColumnFillSpawn")
 
+	if w.Ultra != nil {
+		// Ultra: placement is by slot; any pane works as the inherit source.
+		inherit := w.ActivePane
+		if inherit == nil {
+			if panes := w.Panes(); len(panes) > 0 {
+				inherit = panes[0]
+			}
+		}
+		if inherit == nil {
+			return ColumnFillSpawnPlan{}, fmt.Errorf("no panes in layout")
+		}
+		return ColumnFillSpawnPlan{InheritPaneID: inherit.ID, RootSplit: true}, nil
+	}
+
 	root := w.logicalRoot()
 	if root == nil {
 		return ColumnFillSpawnPlan{}, fmt.Errorf("no layout")

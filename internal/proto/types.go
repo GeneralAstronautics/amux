@@ -10,6 +10,7 @@ type LayoutSnapshot struct {
 	ActivePaneID uint32         `json:"active_pane_id"`
 	ZoomedPaneID uint32         `json:"zoomed_pane_id"`
 	LeadPaneID   uint32         `json:"lead_pane_id,omitempty"`
+	Ultra        *UltraSnapshot `json:"ultra,omitempty"`
 	Notice       string         `json:"notice,omitempty"`
 	Root         CellSnapshot   `json:"root"`
 	Panes        []PaneSnapshot `json:"panes"`
@@ -32,8 +33,21 @@ type WindowSnapshot struct {
 	ZoomedPaneID uint32         `json:"zoomed_pane_id"`
 	RemoteMirror bool           `json:"remote_mirror,omitempty"`
 	LeadPaneID   uint32         `json:"lead_pane_id,omitempty"`
+	Ultra        *UltraSnapshot `json:"ultra,omitempty"`
 	Root         CellSnapshot   `json:"root"`
 	Panes        []PaneSnapshot `json:"panes"`
+}
+
+// UltraSnapshot describes a window's ultra (fixed-slot paginated grid) state.
+// Slots lists agent slot pane IDs in slot order; 0 is an empty slot. The lead
+// pane occupies cell 0 of every page and is not part of Slots.
+type UltraSnapshot struct {
+	Rows        int      `json:"rows"`
+	Cols        int      `json:"cols"`
+	Page        int      `json:"page"`  // 0-based visible page
+	Pages       int      `json:"pages"` // total pages
+	Slots       []uint32 `json:"slots"`
+	AutoPromote bool     `json:"auto_promote"`
 }
 
 const (
@@ -57,6 +71,8 @@ type CellSnapshot struct {
 	IsLeaf   bool           `json:"is_leaf"`
 	Dir      int            `json:"dir"`     // -1 for leaf, 0 for SplitVertical, 1 for SplitHorizontal
 	PaneID   uint32         `json:"pane_id"` // only for leaves
+	Slot     int            `json:"slot,omitempty"`      // ultra: 1-based agent slot number (leaf may be empty)
+	LeadSlot bool           `json:"lead_slot,omitempty"` // ultra: reserved lead cell
 	Children []CellSnapshot `json:"children,omitempty"`
 }
 
@@ -76,6 +92,9 @@ type PaneSnapshot struct {
 	TrackedPRs    []TrackedPR       `json:"tracked_prs,omitempty"`
 	TrackedIssues []TrackedIssue    `json:"tracked_issues,omitempty"`
 	Lead          bool              `json:"lead,omitempty"`
+	// Ultra layout: 1-based agent slot and whether the pane is on a hidden page.
+	Slot   int  `json:"slot,omitempty"`
+	Hidden bool `json:"hidden,omitempty"`
 }
 
 // CaptureJSON is the full-screen JSON capture output.

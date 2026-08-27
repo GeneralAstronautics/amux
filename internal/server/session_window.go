@@ -42,7 +42,7 @@ func (s *Session) previousWindow() *mux.Window {
 // findWindowByPaneID returns the window containing the given pane, or nil.
 func (s *Session) findWindowByPaneID(paneID uint32) *mux.Window {
 	for _, w := range s.Windows {
-		if w.Root.FindPane(paneID) != nil {
+		if w.HasPane(paneID) {
 			return w
 		}
 	}

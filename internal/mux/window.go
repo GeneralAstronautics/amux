@@ -25,6 +25,12 @@ type Window struct {
 	Height       int
 	ZoomedPaneID uint32 // non-zero when a pane is zoomed to full window
 	LeadPaneID   uint32 // non-zero when a pane is designated lead; multi-pane windows anchor it as a full-height left column
+
+	// Ultra is non-nil when the window uses the fixed-slot paginated grid
+	// layout (see ultra.go). ultraLead caches the lead pane pointer because
+	// the lead cell may be empty and hidden panes are not in Root.
+	Ultra     *UltraLayout
+	ultraLead *Pane
 }
 
 // SplitOptions controls pane-splitting behavior.
@@ -72,6 +78,9 @@ func (w *Window) SplitRootWithOptions(dir SplitDir, newPane *Pane, opts SplitOpt
 		if err := w.Unzoom(); err != nil {
 			return nil, err
 		}
+	}
+	if w.Ultra != nil {
+		return w.ultraInsert(newPane, opts)
 	}
 	if w.hasPendingLead() {
 		// First split on a single-pane lead window always anchors the lead on the
@@ -185,6 +194,9 @@ func (w *Window) SplitPaneWithOptions(targetPaneID uint32, dir SplitDir, newPane
 			return nil, err
 		}
 	}
+	if w.Ultra != nil {
+		return w.ultraInsert(newPane, opts)
+	}
 	if w.hasPendingLead() && targetPaneID == w.LeadPaneID {
 		return w.materializePendingLead(newPane, opts)
 	}
@@ -288,6 +300,9 @@ func (w *Window) MovePaneIntoSplit(paneID, targetPaneID uint32, dir SplitDir, in
 	if paneID == targetPaneID {
 		return nil
 	}
+	if w.Ultra != nil {
+		return errUltraLayout
+	}
 	if w.IsLeadPane(paneID) || w.IsLeadPane(targetPaneID) {
 		return fmt.Errorf("cannot operate on lead pane")
 	}
@@ -354,6 +369,9 @@ func (w *Window) MovePaneIntoSplit(paneID, targetPaneID uint32, dir SplitDir, in
 // MovePaneToRootEdge reparents paneID into a new split at the logical root.
 func (w *Window) MovePaneToRootEdge(paneID uint32, dir SplitDir, insertFirst bool) error {
 	w.assertOwner("MovePaneToRootEdge")
+	if w.Ultra != nil {
+		return errUltraLayout
+	}
 	if w.IsLeadPane(paneID) {
 		return fmt.Errorf("cannot operate on lead pane")
 	}
@@ -397,6 +415,9 @@ func (w *Window) MovePaneToRootEdge(paneID uint32, dir SplitDir, insertFirst boo
 // If the closed pane was zoomed, zoom is automatically cleared.
 func (w *Window) ClosePane(paneID uint32) error {
 	w.assertOwner("ClosePane")
+	if w.Ultra != nil {
+		return w.ultraClose(paneID)
+	}
 	cell, err := w.mustFindPane(paneID)
 	if err != nil {
 		return err
@@ -467,6 +488,9 @@ func (w *Window) ClosePane(paneID uint32) error {
 
 // PaneCount returns the number of panes in the window's layout tree.
 func (w *Window) PaneCount() int {
+	if w.Ultra != nil {
+		return len(w.ultraPanes())
+	}
 	count := 0
 	w.Root.Walk(func(c *LayoutCell) {
 		if c.Pane != nil {
@@ -478,6 +502,9 @@ func (w *Window) PaneCount() int {
 
 // Panes returns all panes in the window (depth-first order).
 func (w *Window) Panes() []*Pane {
+	if w.Ultra != nil {
+		return w.ultraPanes()
+	}
 	var panes []*Pane
 	w.Root.Walk(func(c *LayoutCell) {
 		if c.Pane != nil {
@@ -562,6 +589,9 @@ func (w *Window) SwapPanes(id1, id2 uint32) error {
 	if w.IsLeadPane(id1) || w.IsLeadPane(id2) {
 		return fmt.Errorf("cannot operate on lead pane")
 	}
+	if w.Ultra != nil {
+		return w.ultraSwap(id1, id2)
+	}
 	cell1, err := w.mustFindPane(id1)
 	if err != nil {
 		return err
@@ -578,6 +608,9 @@ func (w *Window) SwapPanes(id1, id2 uint32) error {
 // SwapTree swaps the root-level groups containing the given panes.
 func (w *Window) SwapTree(id1, id2 uint32) error {
 	w.assertOwner("SwapTree")
+	if w.Ultra != nil {
+		return errUltraLayout
+	}
 	_, idx1, err := w.rootChildForPaneID(id1)
 	if err != nil {
 		return err
@@ -609,6 +642,9 @@ func (w *Window) MovePane(paneID, targetPaneID uint32, before bool) error {
 	w.assertOwner("MovePane")
 	if paneID == targetPaneID {
 		return nil
+	}
+	if w.Ultra != nil {
+		return errUltraLayout
 	}
 
 	if w.IsLeadPane(paneID) || w.IsLeadPane(targetPaneID) {
@@ -673,6 +709,9 @@ func (w *Window) MovePaneDown(paneID uint32) error {
 }
 
 func (w *Window) movePaneWithinSplitGroup(paneID uint32, delta int) error {
+	if w.Ultra != nil {
+		return errUltraLayout
+	}
 	parent, idx, err := w.splitGroupForPaneID(paneID)
 	if err != nil {
 		return err
@@ -739,6 +778,9 @@ func (w *Window) SwapPaneBackward() error {
 // first cell.
 func (w *Window) RotatePanes(forward bool) error {
 	w.assertOwner("RotatePanes")
+	if w.Ultra != nil {
+		return errUltraLayout
+	}
 	cells := w.paneLeavesIn(w.logicalRoot())
 	if len(cells) <= 1 {
 		return nil
@@ -798,6 +840,7 @@ func (w *Window) Zoom(paneID uint32) error {
 		}
 	}
 
+	w.ultraShowPane(paneID)
 	cell, err := w.mustFindPane(paneID)
 	if err != nil {
 		return err
@@ -847,6 +890,16 @@ func (w *Window) Unzoom() error {
 // geometry or pane ID-based zoom/lead bookkeeping.
 func (w *Window) ReplacePane(oldPaneID uint32, replacement *Pane) error {
 	w.assertOwner("ReplacePane")
+	if w.Ultra != nil {
+		if !w.ultraReplacePane(oldPaneID, replacement) {
+			return fmt.Errorf("pane %d not found in layout", oldPaneID)
+		}
+		if w.ActivePane != nil && w.ActivePane.ID == oldPaneID {
+			w.ActivePane = replacement
+		}
+		w.rebuildUltraTree()
+		return nil
+	}
 	cell, err := w.mustFindPane(oldPaneID)
 	if err != nil {
 		return err
@@ -868,6 +921,18 @@ func (w *Window) SplicePane(oldPaneID uint32, newPanes []*Pane) ([]*LayoutCell, 
 	w.assertOwner("SplicePane")
 	if len(newPanes) == 0 {
 		return nil, fmt.Errorf("no panes to splice")
+	}
+	if w.Ultra != nil && len(newPanes) > 1 {
+		return nil, errUltraLayout
+	}
+	if w.Ultra != nil {
+		if err := w.ReplacePane(oldPaneID, newPanes[0]); err != nil {
+			return nil, err
+		}
+		if cell := w.Root.FindPane(newPanes[0].ID); cell != nil {
+			return []*LayoutCell{cell}, nil
+		}
+		return nil, nil
 	}
 
 	cell, err := w.mustFindPane(oldPaneID)
@@ -940,6 +1005,9 @@ func (w *Window) SplicePane(oldPaneID uint32, newPanes []*Pane) ([]*LayoutCell, 
 // a takeover and restore the original SSH pane.
 func (w *Window) UnsplicePane(hostName string, replacement *Pane) error {
 	w.assertOwner("UnsplicePane")
+	if w.Ultra != nil {
+		return w.ultraUnsplice(hostName, replacement)
+	}
 	allProxyLeavesForHost := func(cell *LayoutCell) bool {
 		if cell == nil {
 			return false
@@ -1023,6 +1091,8 @@ func (w *Window) ApplyLayout(root *LayoutCell, activePane *Pane, width, height i
 	root.Y = 0
 	root.ResizeAll(width, height)
 
+	w.Ultra = nil
+	w.ultraLead = nil
 	w.Root = root
 	w.Width = width
 	w.Height = height
@@ -1042,6 +1112,9 @@ func (w *Window) SplicePaneWithLayout(oldPaneID uint32, subtree *LayoutCell, act
 	w.assertOwner("SplicePaneWithLayout")
 	if subtree == nil {
 		return fmt.Errorf("missing subtree")
+	}
+	if w.Ultra != nil {
+		return errUltraLayout
 	}
 
 	cell, err := w.mustFindPane(oldPaneID)

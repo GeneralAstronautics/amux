@@ -61,6 +61,7 @@ delivery_state fields: message_id string; recipient pane_address; delivered_at s
 	prevWindowUsage   = "usage: amux prev-window"
 	lastWindowUsage   = "usage: amux last-window"
 	zoomUsage         = "usage: amux zoom [pane]"
+	layoutUsage       = "usage: amux layout [ultra [--page N] [--rows R] [--cols C] [--no-auto-promote] | off | page <next|prev|N> | toggle | status]"
 )
 
 var commandUsageByName = map[string]string{
@@ -78,6 +79,7 @@ var commandUsageByName = map[string]string{
 	"focus":            focusUsage,
 	"install-terminfo": "usage: amux install-terminfo",
 	"kill":             "usage: amux kill [--cleanup] [--remote] [--timeout <duration>] [pane]",
+	"layout":           layoutUsage,
 	"lead":             leadUsage,
 	"list":             listUsage,
 	"list-clients":     listClientsUsage,

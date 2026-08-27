@@ -25,6 +25,9 @@ func (w *Window) SetLead(paneID uint32) error {
 			return err
 		}
 	}
+	if w.Ultra != nil {
+		return w.ultraSetLead(paneID)
+	}
 
 	cell := w.Root.FindPane(paneID)
 	if cell == nil {
@@ -104,6 +107,9 @@ func (w *Window) UnsetLead() error {
 	w.assertOwner("UnsetLead")
 	if w.LeadPaneID == 0 {
 		return fmt.Errorf("no lead pane set")
+	}
+	if w.Ultra != nil {
+		return w.ultraUnsetLead()
 	}
 	w.LeadPaneID = 0
 	return nil

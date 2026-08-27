@@ -441,6 +441,7 @@ func (c *Compositor) buildGridWithOverlay(root *mux.LayoutCell, activePaneID uin
 		})
 	})
 	c.composePanes(g, layoutHeight, panes)
+	buildEmptySlotCells(g, root, layoutHeight)
 
 	// Border cells.
 	if c.cachedBorderMap == nil || c.cachedBorderRoot != root || c.cachedBorderH != layoutHeight {
@@ -1225,6 +1226,10 @@ func buildGlobalBarCellsWithStyle(g *ScreenGrid, sessionName string, paneCount i
 		cells = appendStyledCells(cells, "│ ", baseStyle)
 	} else {
 		cells = appendStyledCells(cells, sessionName+" ", baseStyle)
+	}
+	if label := globalBarUltraLabel(windows); label != "" {
+		cells = appendStyledCells(cells, label+" ", focusedStyle)
+		cells = appendStyledCells(cells, "│ ", baseStyle)
 	}
 
 	rightText := ""

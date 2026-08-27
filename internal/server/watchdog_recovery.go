@@ -12,7 +12,6 @@ import (
 
 	"github.com/weill-labs/amux/internal/checkpoint"
 	"github.com/weill-labs/amux/internal/eventloop"
-	"github.com/weill-labs/amux/internal/mux"
 	"github.com/weill-labs/amux/internal/reload"
 )
 
@@ -106,9 +105,9 @@ func (s *Session) buildWatchdogRecoveryCheckpoint() (*checkpoint.ServerCheckpoin
 			pc.PID = p.ProcessPid()
 		}
 		for _, w := range s.Windows {
-			if cell := w.Root.FindPane(p.ID); cell != nil {
-				pc.Cols = cell.W
-				pc.Rows = mux.PaneContentHeight(cell.H)
+			if cols, rows, ok := w.PaneContentSize(p.ID); ok {
+				pc.Cols = cols
+				pc.Rows = rows
 				break
 			}
 		}

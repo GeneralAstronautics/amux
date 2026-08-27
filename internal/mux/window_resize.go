@@ -15,6 +15,10 @@ func (w *Window) Resize(width, height int) {
 	w.assertOwner("Resize")
 	w.Width = width
 	w.Height = height
+	if w.Ultra != nil {
+		w.rebuildUltraTree()
+		return
+	}
 	w.Root.ResizeAll(width, height)
 
 	w.resizePTYsPreservingZoomedPaneSize()
@@ -26,6 +30,9 @@ func (w *Window) Resize(width, height int) {
 // Returns true if a resize was performed.
 func (w *Window) ResizeBorder(x, y, delta int) bool {
 	w.assertOwner("ResizeBorder")
+	if w.Ultra != nil {
+		return false
+	}
 	hit := w.Root.FindBorderNear(x, y)
 	if hit == nil || delta == 0 {
 		return false
@@ -85,7 +92,7 @@ func (w *Window) ResizeActive(direction string, delta int) bool {
 // Returns true if a resize was performed.
 func (w *Window) ResizePane(paneID uint32, direction string, delta int) bool {
 	w.assertOwner("ResizePane")
-	if delta <= 0 {
+	if delta <= 0 || w.Ultra != nil {
 		return false
 	}
 	if w.IsLeadPane(paneID) {
@@ -177,7 +184,7 @@ func (w *Window) EqualizeWithOptions(widths, heights bool, opts SplitOptions) bo
 }
 
 func (w *Window) equalizeWithOptions(widths, heights bool, opts SplitOptions) bool {
-	if w.Root == nil || (!widths && !heights) {
+	if w.Root == nil || (!widths && !heights) || w.Ultra != nil {
 		return false
 	}
 
