@@ -1166,6 +1166,7 @@ func runSessionWithDeps(sessionName string, getTermSize func(int) (int, int, err
 				localActivity = hasActivityInput(raw)
 				if localActivity {
 					cr.MarkLocalInput()
+					cr.AcknowledgeActivePane()
 				}
 			}
 

@@ -414,7 +414,7 @@ func (c *Compositor) buildGridWithOverlay(root *mux.LayoutCell, activePaneID uin
 	// Determine active pane color for borders.
 	var activeColorHex string
 	if pd := lookup(activePaneID); pd != nil && pd.Color() != "" {
-		activeColorHex = pd.Color()
+		activeColorHex = accentHex(pd.Color())
 	}
 
 	paneCount := 0
@@ -1114,11 +1114,7 @@ func buildStatusCellsPressedWithIconsAndStyle(g *ScreenGrid, cell *mux.LayoutCel
 	}
 
 	y := cell.Y
-	bgHex := config.Surface0Hex
-	if pressed {
-		bgHex = config.Surface1Hex
-	}
-	bg := hexToColor(bgHex)
+	bg := hexToColor(paneStatusBgHex(pd, pressed))
 	colorHex := paneStatusColorHex(pd)
 	palette := newPaneStatusGridPalette(colorHex, bg)
 	var cells []ScreenCell

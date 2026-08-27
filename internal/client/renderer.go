@@ -25,6 +25,7 @@ type Renderer struct {
 	compositor      *render.Compositor
 	scrollbackLines int
 	closeOnce       sync.Once
+	attention       *attentionTracker
 
 	// OnPaneResize is called during HandleLayout after an emulator is resized.
 	// The main package uses this to resize copy mode instances. May be nil.
@@ -38,6 +39,7 @@ func NewWithScrollback(width, height, scrollbackLines int) *Renderer {
 		commands:        make(chan rendererCommand),
 		compositor:      compositor,
 		scrollbackLines: scrollbackLines,
+		attention:       newAttentionTracker(),
 	}
 	initial := newRendererSnapshot(width, height, scrollbackLines)
 	r.state.Store(initial)
@@ -157,6 +159,8 @@ func (r *Renderer) HandleLayout(snap *proto.LayoutSnapshot) bool {
 				resizeEmulatorIfNeeded(emu, next.width, mux.PaneContentHeight(layoutH))
 			}
 		}
+
+		r.attention.observeLayout(prev, next)
 
 		st.snapshot = next
 		st.emulators = nextEmulators

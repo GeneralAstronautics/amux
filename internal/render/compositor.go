@@ -208,7 +208,7 @@ func (c *Compositor) RenderFullWithOverlayStats(root *mux.LayoutCell, activePane
 	// Determine active pane color for borders
 	var activeColor string
 	if pd := lookup(activePaneID); pd != nil && pd.Color() != "" {
-		activeColor = hexToANSIWithProfile(pd.Color(), c.colorProfile)
+		activeColor = hexToANSIWithProfile(accentHex(pd.Color()), c.colorProfile)
 	} else {
 		activeColor = fgHexSequence(config.BlueHex, c.colorProfile)
 	}

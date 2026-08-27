@@ -117,18 +117,21 @@ const (
 
 func paneStatusColorHex(pd PaneData) string {
 	if color := pd.Color(); color != "" {
-		return color
+		return accentHex(color)
 	}
 	return config.TextColorHex
 }
 
+// paneBorderTintColorHex returns a border color override for a pane. Mirror
+// connection state wins over attention (done-flash / needs-input) tints.
 func paneBorderTintColorHex(pd PaneData) string {
-	status, ok := paneMirrorStatusForPane(pd)
-	if !ok {
-		return ""
+	if status, ok := paneMirrorStatusForPane(pd); ok {
+		if status.state == mirrorStateReconnecting || status.state == mirrorStateConnecting {
+			return config.PeachHex
+		}
 	}
-	if status.state == mirrorStateReconnecting || status.state == mirrorStateConnecting {
-		return config.PeachHex
+	if att := paneAttentionFor(pd); att.BorderHex != "" {
+		return att.BorderHex
 	}
 	return ""
 }
@@ -678,7 +681,7 @@ func renderPaneStatusPressedWithProfileAndIconsAndStyle(buf *strings.Builder, ce
 		return
 	}
 
-	styles := newStatusBarStylesPressed(paneStatusColorHex(pd), pressed)
+	styles := newStatusBarStylesWithBg(paneStatusColorHex(pd), paneStatusBgHex(pd, pressed))
 	segments := buildPaneStatusSegmentsWithIcons(cell.W, isActive, pd, icons)
 	for _, segment := range segments {
 		writeStyledTextWithProfile(buf, styles.pane(segment.role), segment.text, profile)

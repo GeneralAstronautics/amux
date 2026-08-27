@@ -285,6 +285,7 @@ func (cr *ClientRenderer) paneLookup(state *clientSnapshot) func(*rendererActorS
 			cm:              cm,
 			hideCursor:      paneDragHidesCursor(state, st.snapshot.activePaneID, paneID),
 			caps:            st.snapshot.capabilities,
+			attention:       cr.renderer.attention.attentionFor(paneID, paneID == st.snapshot.activePaneID),
 		}
 	}
 }
@@ -477,6 +478,33 @@ type clientRenderLoopState struct {
 	renderFrameInterval time.Duration
 	pendingOutputBytes  int
 	forceFullRedraw     bool
+
+	// Attention (done-flash) animation timer — armed after each render while
+	// a flash is in progress so pulse edges repaint without pane output.
+	attentionTimer *time.Timer
+	attentionC     <-chan time.Time
+}
+
+func (st *clientRenderLoopState) stopAttentionTimer() {
+	if st.attentionTimer == nil {
+		return
+	}
+	st.attentionTimer.Stop()
+	st.attentionTimer = nil
+	st.attentionC = nil
+}
+
+func (st *clientRenderLoopState) armAttentionTimer(deadline time.Time, ok bool) {
+	st.stopAttentionTimer()
+	if !ok {
+		return
+	}
+	delay := time.Until(deadline)
+	if delay < 0 {
+		delay = 0
+	}
+	st.attentionTimer = time.NewTimer(delay)
+	st.attentionC = st.attentionTimer.C
 }
 
 func (st *clientRenderLoopState) stopScheduledRender() {
@@ -803,6 +831,7 @@ func (cr *ClientRenderer) renderNow(state *clientRenderLoopState, write func(str
 	state.renderC = nil
 	state.pendingOutputBytes = 0
 	state.forceFullRedraw = false
+	state.armAttentionTimer(cr.attentionDeadline())
 }
 
 func (cr *ClientRenderer) MarkLocalInput() {
@@ -854,6 +883,14 @@ func (cr *ClientRenderer) RenderCoalesced(msgCh <-chan *RenderMsg, write func(st
 			case <-cr.renderStop:
 				return
 			case <-state.renderC:
+				cr.renderNow(state, write)
+				continue
+			case <-state.attentionC:
+				state.attentionTimer = nil
+				state.attentionC = nil
+				// Border/title tints live outside pane-output dirty regions.
+				cr.RequestFullRedraw()
+				state.stopScheduledRender()
 				cr.renderNow(state, write)
 				continue
 			}
@@ -1138,7 +1175,11 @@ type clientPaneData struct {
 	cm              *copymode.CopyMode // nil when not in copy mode
 	hideCursor      bool
 	caps            proto.ClientCapabilities
+	attention       render.PaneAttention
 }
+
+// Attention implements render.PaneAttentionProvider.
+func (c *clientPaneData) Attention() render.PaneAttention { return c.attention }
 
 func (c *clientPaneData) suppressCursor(active bool) bool {
 	return !active || c.hideCursor

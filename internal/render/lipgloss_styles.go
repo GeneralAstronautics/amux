@@ -54,11 +54,12 @@ func newStatusBarStyles(accentHex string) statusBarStyles {
 }
 
 func newStatusBarStylesPressed(accentHex string, pressed bool) statusBarStyles {
+	return newStatusBarStylesWithBg(accentHex, statusBarBaseBgHex(pressed))
+}
+
+func newStatusBarStylesWithBg(accentHex string, bgHex string) statusBarStyles {
 	palette := newCatppuccinMochaLipGlossPalette()
-	bgColor := palette.surface0
-	if pressed {
-		bgColor = hexToLipGlossColor(config.Surface1Hex)
-	}
+	bgColor := hexToLipGlossColor(bgHex)
 	base := lipgloss.NewStyle().
 		Inline(true).
 		Background(bgColor)

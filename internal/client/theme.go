@@ -14,6 +14,8 @@ func iconSetForConfig(mode string) render.IconSet {
 }
 
 func (cr *ClientRenderer) ConfigureTheme(cfg *config.Config) {
+	config.ApplyPalette(cfg.EffectivePalette())
+	cr.ConfigureAttention(cfg.EffectiveAttention())
 	if cfg == nil {
 		cr.SetIconSet(render.DefaultIconSet())
 		return
