@@ -437,6 +437,7 @@ func (c *Compositor) buildGridWithOverlay(root *mux.LayoutCell, activePaneID uin
 			isActive:    pid == activePaneID,
 			pressed:     overlay.IsPanePressed(pid),
 			copyOverlay: pd.CopyModeOverlay(),
+			altTintBg:   c.paneAltTintBg(root, pid),
 		})
 	})
 	c.composePanes(g, layoutHeight, panes)
@@ -480,6 +481,7 @@ type paneComposite struct {
 	isActive    bool
 	pressed     bool
 	copyOverlay *proto.ViewportOverlay
+	altTintBg   string
 }
 
 func paneBorderTintMap(panes []paneComposite) map[uint32]string {
@@ -510,6 +512,7 @@ func (c *Compositor) composePane(g *ScreenGrid, layoutHeight int, pane paneCompo
 	for row := 0; row < contentH; row++ {
 		buildPaneContentCells(g, pane.cell, row, pane.isActive, pane.pd, pane.copyOverlay)
 	}
+	applyPaneContentBackground(g, pane.cell, contentH, pane.altTintBg)
 	clearPaneContentRows(g, pane.cell, contentH, mux.PaneContentHeight(pane.cell.H))
 }
 
@@ -573,6 +576,7 @@ func (c *Compositor) buildGridWithOverlayDirty(
 			isActive:    pid == activePaneID,
 			pressed:     overlay.IsPanePressed(pid),
 			copyOverlay: pd.CopyModeOverlay(),
+			altTintBg:   c.paneAltTintBg(root, pid),
 		})
 		markDirtyRows(dirtyRows, cell.Y, cell.Y+cell.H)
 	})

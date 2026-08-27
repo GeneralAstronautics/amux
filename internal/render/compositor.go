@@ -61,6 +61,12 @@ type Compositor struct {
 	colorProfile      termenv.Profile
 	iconSet           IconSet
 	statusStyle       string
+
+	// Alternating pane content tint (checkerboard). Empty disables.
+	altTintBg string
+	// Cached parity map — rebuilt alongside the border map.
+	cachedParityRoot *mux.LayoutCell
+	cachedParity     map[uint32]struct{}
 }
 
 type cursorRenderState struct {
@@ -157,6 +163,38 @@ func (c *Compositor) SetStatusStyle(style string) {
 	}
 	c.statusStyle = style
 	c.clearPrevGrid()
+}
+
+// SetAlternateTintBg sets the content background applied to odd-parity panes
+// so adjacent panes contrast. Empty disables alternating tints.
+func (c *Compositor) SetAlternateTintBg(hex string) {
+	if c.altTintBg == hex {
+		return
+	}
+	c.altTintBg = hex
+	c.clearPrevGrid()
+}
+
+// AlternateTintBg reports the current alternating tint background.
+func (c *Compositor) AlternateTintBg() string {
+	return c.altTintBg
+}
+
+func (c *Compositor) paneAltTintBg(root *mux.LayoutCell, paneID uint32) string {
+	if c.altTintBg == "" {
+		return ""
+	}
+	if c.cachedParityRoot != root || c.cachedParity == nil {
+		c.cachedParity = paneTintParity(root)
+		c.cachedParityRoot = root
+		if c.cachedParity == nil {
+			c.cachedParity = map[uint32]struct{}{}
+		}
+	}
+	if _, odd := c.cachedParity[paneID]; odd {
+		return c.altTintBg
+	}
+	return ""
 }
 
 // StatusStyle reports the compositor's current human-facing status bar preset.

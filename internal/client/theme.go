@@ -16,6 +16,11 @@ func iconSetForConfig(mode string) render.IconSet {
 func (cr *ClientRenderer) ConfigureTheme(cfg *config.Config) {
 	config.ApplyPalette(cfg.EffectivePalette())
 	cr.ConfigureAttention(cfg.EffectiveAttention())
+	if alt := cfg.EffectiveAlternateTint(); alt.Enabled {
+		cr.SetAlternateTintBg(alt.Bg)
+	} else {
+		cr.SetAlternateTintBg("")
+	}
 	if cfg == nil {
 		cr.SetIconSet(render.DefaultIconSet())
 		return

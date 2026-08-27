@@ -253,3 +253,13 @@ func (cr *ClientRenderer) attentionDeadline() (time.Time, bool) {
 	}
 	return cr.renderer.attention.nextDeadline()
 }
+
+// SetAlternateTintBg configures the alternating pane content tint.
+func (cr *ClientRenderer) SetAlternateTintBg(hex string) {
+	if cr == nil || cr.renderer == nil {
+		return
+	}
+	cr.renderer.withActor(func(st *rendererActorState) {
+		st.compositor.SetAlternateTintBg(hex)
+	})
+}
