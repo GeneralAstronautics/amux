@@ -502,6 +502,62 @@ with `AMUX_CLIENT_CAPABILITIES`. Use a comma-separated list of capability names:
 scrollback_lines = 5000    # optional: retained history per pane (default: 5000, must be >= 1)
 ```
 
+### Client
+
+```toml
+[client]
+local_echo = "auto"              # auto | on | off — predictive local echo
+local_echo_style = "dim"         # dim | underline | plain
+mouse_focus_click = "focus-only" # focus-only | forward (see below)
+```
+
+`mouse_focus_click` controls a mouse button press on a pane that is **not**
+active while that pane's application has mouse tracking enabled (Claude Code,
+vim, htop, ...). With `focus-only` (default) the click only focuses the pane;
+the press, any drag motion, and the release are swallowed so the application
+never receives a click it did not own. Clicks on the already-active pane and
+wheel events are always forwarded. `forward` restores the old behaviour of
+focusing *and* forwarding the click.
+
+### Theme
+
+```toml
+[theme]
+icons = "unicode"          # ascii | unicode | nerd
+status_style = "compact"   # compact | plain | powerline
+preset = "default"         # default | soft — base palette for borders/status/global bar
+
+done_flash = true          # pulse a pane's border+title when its agent goes busy -> idle unfocused
+done_flash_color = "#a6e3a1"
+done_flash_bg = "#3a5a45"  # "" for border-only
+done_flash_duration_ms = 1500
+done_flash_pulses = 3
+
+needs_input_glow = true    # steady tint on a finished pane until you focus/type in it
+needs_input_color = "#b4befe"
+needs_input_bg = "#3b3b5e" # "" for border-only
+
+alternate_tints = true     # checkerboard content background so adjacent panes contrast
+alternate_tint_bg = "#23232e"
+
+[theme.colors]             # optional per-role overrides on top of the preset
+dim = "#6c7086"            # inactive borders
+text = "#cdd6f4"
+surface0 = "#313244"       # status-line / global-bar background
+surface1 = "#45475a"       # pressed status-line background
+blue = "#89b4fa"           # focused window tab
+green = "#a6e3a1"
+yellow = "#f9e2af"
+peach = "#fab387"
+red = "#f38ba8"
+mauve = "#cba6f7"
+footer_key = "#858392"
+accent_soften = 0.0        # 0..1 — desaturate per-pane accents when drawing borders/titles
+```
+
+Every key is optional. See [docs/themes.md](docs/themes.md) for what each
+feature looks like and how to tune it.
+
 ### Debugging
 
 ```toml

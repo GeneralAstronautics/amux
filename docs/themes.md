@@ -161,5 +161,102 @@ amux is configured with a Nerd Font-compatible patched font. Add
 `status_style = "powerline"` only after Powerline separators also render
 correctly.
 
-Color and style-string customization is tracked separately in
-[LAB-114](https://linear.app/weill-labs/issue/LAB-114/configurable-color-themes-and-style-strings).
+## Color Presets And Overrides
+
+`[theme] preset` selects the base palette used for borders, pane status lines,
+the global bar, and modal chrome. Per-pane accent colours (the colour each
+pane is assigned at creation, shown in `capture --colors`) are unchanged by
+presets.
+
+```toml
+[theme]
+preset = "soft" # default | soft
+```
+
+| Value | Use when |
+| --- | --- |
+| `default` | The original Catppuccin Mocha palette. |
+| `soft` | You run many panes in a terminal such as Ghostty and the default reads as harsh: lower-contrast dim borders, muted status backgrounds, desaturated indicator colours, and `accent_soften = 0.3` so pane accents are toned down when drawn. |
+
+Any role can be overridden on top of the preset in `[theme.colors]`. Values
+are 6-digit hex with or without `#`:
+
+```toml
+[theme]
+preset = "soft"
+
+[theme.colors]
+dim = "#3c3f52"        # even softer inactive borders
+surface0 = "#20202c"   # status-line background
+accent_soften = 0.5    # 0 = server-assigned accent as-is, 1 = fully grey
+```
+
+Roles: `dim`, `text`, `surface0`, `surface1`, `blue`, `mauve`, `footer_key`,
+`green`, `yellow`, `peach`, `red`, `accent_soften`.
+
+Palette changes are client-side presentation only. Structured capture JSON,
+`capture --colors` letters, and event payloads never change.
+
+## Done Flash
+
+When a pane's agent transitions busy → idle (the same edge that emits the
+`idle` event) **and the pane is not the focused pane**, amux pulses that pane's
+border and title background so completion is visible from across the layout.
+The focused pane never flashes — you are already looking at it.
+
+```toml
+[theme]
+done_flash = true              # default on
+done_flash_color = "#a6e3a1"   # border colour while a pulse is on
+done_flash_bg = "#3a5a45"      # title-bar background while a pulse is on; "" = border only
+done_flash_duration_ms = 1500  # total flash length (100–10000)
+done_flash_pulses = 3          # number of on/off pulses (1–10)
+```
+
+Panes that were already idle when you attached do not flash; only live
+transitions do. A pane going busy again cancels its flash.
+
+## Needs-Input Glow
+
+After the flash (or immediately, if `done_flash = false`) a pane that finished
+while you were elsewhere keeps a **steady, subtle** tint on its border and
+title background until you acknowledge it by focusing it or typing into it.
+This is the "an agent is waiting on you" signal; it is deliberately distinct
+from the done-flash pulse and from a plain idle pane (dim border, default
+title background).
+
+```toml
+[theme]
+needs_input_glow = true        # default on
+needs_input_color = "#b4befe"  # border
+needs_input_bg = "#3b3b5e"     # title-bar background; "" = border only
+```
+
+The glow clears when the pane is focused, when you type into it, or when its
+agent goes busy again. A pane's mirror-connection tint (peach while
+reconnecting) always takes precedence over attention tints.
+
+## Alternating Pane Tints
+
+Adjacent panes get a checkerboard content background so their boundaries are
+easy to see. Parity is derived from layout position (column left→right, then
+row within the column), so any two panes that share a border differ.
+
+```toml
+[theme]
+alternate_tints = true         # default on
+alternate_tint_bg = "#23232e"  # background applied to odd-parity panes
+```
+
+Only cells that use the terminal's default background are tinted; application
+colours are preserved. The tint is applied by the interactive client's grid
+renderer only — `amux capture`, `capture --colors`, and `AMUX_RENDER=full`
+are unchanged. Pick a value a few steps lighter or darker than your terminal
+background; with `AMUX_COLOR_PROFILE=ansi256` it is snapped to the nearest
+256-colour entry.
+
+## Powerline Status Style Note
+
+With `status_style = "powerline"` the done-flash and needs-input tints apply
+to the pane border only; the powerline title segments keep their own
+backgrounds.
