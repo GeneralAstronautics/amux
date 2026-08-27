@@ -529,13 +529,13 @@ preset = "default"         # default | soft — base palette for borders/status/
 
 done_flash = true          # pulse a pane's border+title when its agent goes busy -> idle unfocused
 done_flash_color = "#a6e3a1"
-done_flash_bg = "#3a5a45"  # "" for border-only
+done_flash_bg = "#3f6b4c"  # "" for border-only
 done_flash_duration_ms = 1500
 done_flash_pulses = 3
 
 needs_input_glow = true    # steady tint on a finished pane until you focus/type in it
 needs_input_color = "#b4befe"
-needs_input_bg = "#3b3b5e" # "" for border-only
+needs_input_bg = "#4a4478" # "" for border-only
 
 alternate_tints = true     # checkerboard content background so adjacent panes contrast
 alternate_tint_bg = "#23232e"

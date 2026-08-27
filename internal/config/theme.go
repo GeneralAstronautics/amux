@@ -243,11 +243,11 @@ func NormalizeHexColor(field, value string) (string, error) {
 // Attention (done-flash / needs-input glow) defaults.
 const (
 	DefaultDoneFlashColor      = "a6e3a1" // green border while flashing
-	DefaultDoneFlashBg         = "3a5a45" // muted green title background while flashing
+	DefaultDoneFlashBg         = "3f6b4c" // green title background while flashing
 	DefaultDoneFlashDurationMs = 1500
 	DefaultDoneFlashPulses     = 3
 	DefaultNeedsInputColor     = "b4befe" // lavender border
-	DefaultNeedsInputBg        = "3b3b5e" // muted indigo title background
+	DefaultNeedsInputBg        = "4a4478" // indigo title background, clearly lighter than the bar
 	DefaultAlternateTintBg     = "23232e" // subtle content background for odd panes
 )
 

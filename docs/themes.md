@@ -208,7 +208,7 @@ The focused pane never flashes — you are already looking at it.
 [theme]
 done_flash = true              # default on
 done_flash_color = "#a6e3a1"   # border colour while a pulse is on
-done_flash_bg = "#3a5a45"      # title-bar background while a pulse is on; "" = border only
+done_flash_bg = "#3f6b4c"      # title-bar background while a pulse is on; "" = border only
 done_flash_duration_ms = 1500  # total flash length (100–10000)
 done_flash_pulses = 3          # number of on/off pulses (1–10)
 ```
@@ -229,7 +229,7 @@ title background).
 [theme]
 needs_input_glow = true        # default on
 needs_input_color = "#b4befe"  # border
-needs_input_bg = "#3b3b5e"     # title-bar background; "" = border only
+needs_input_bg = "#4a4478"     # title-bar background; "" = border only
 ```
 
 The glow clears when the pane is focused, when you type into it, or when its
