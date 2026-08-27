@@ -96,6 +96,41 @@ type DebugConfig struct {
 type ClientConfig struct {
 	LocalEcho      string `toml:"local_echo"`
 	LocalEchoStyle string `toml:"local_echo_style"`
+	// MouseFocusClick controls what happens when a mouse button is pressed on
+	// a pane that is not the active pane while that pane has application
+	// mouse tracking enabled. "focus-only" (default) focuses the pane and
+	// swallows the whole press/drag/release gesture so the app never sees a
+	// click it did not "own". "forward" focuses and also forwards the click.
+	MouseFocusClick string `toml:"mouse_focus_click"`
+}
+
+const (
+	MouseFocusClickFocusOnly = "focus-only"
+	MouseFocusClickForward   = "forward"
+)
+
+// ResolveMouseFocusClick validates client.mouse_focus_click.
+func ResolveMouseFocusClick(mode string) (string, error) {
+	switch mode {
+	case "", MouseFocusClickFocusOnly:
+		return MouseFocusClickFocusOnly, nil
+	case MouseFocusClickForward:
+		return mode, nil
+	default:
+		return "", fmt.Errorf(`client.mouse_focus_click must be one of "focus-only" or "forward"`)
+	}
+}
+
+// EffectiveMouseFocusClick returns the resolved mouse_focus_click mode.
+func (c *Config) EffectiveMouseFocusClick() string {
+	if c == nil {
+		return MouseFocusClickFocusOnly
+	}
+	mode, err := ResolveMouseFocusClick(c.Client.MouseFocusClick)
+	if err != nil {
+		return MouseFocusClickFocusOnly
+	}
+	return mode
 }
 
 const (
@@ -235,6 +270,9 @@ func parseConfig(data []byte) (*Config, error) {
 		return nil, err
 	}
 	if _, err := ResolveLocalEchoStyle(cfg.Client.LocalEchoStyle); err != nil {
+		return nil, err
+	}
+	if _, err := ResolveMouseFocusClick(cfg.Client.MouseFocusClick); err != nil {
 		return nil, err
 	}
 	if _, err := ResolveStatusStyle(cfg.Theme.StatusStyle); err != nil {

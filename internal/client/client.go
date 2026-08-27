@@ -33,6 +33,24 @@ type ClientRenderer struct {
 	// Render timing — configurable for tests. Zero values use defaults.
 	renderFrameInterval  time.Duration
 	renderPriorityWindow time.Duration
+
+	// mouseFocusClickForward preserves the legacy behaviour of forwarding the
+	// click that focuses an inactive app-mouse pane. Default (false) focuses
+	// only. See config.ClientConfig.MouseFocusClick.
+	mouseFocusClickForward atomic.Bool
+}
+
+// ConfigureMouseFocusClick sets how a press on an inactive app-mouse pane is
+// handled; see config.ResolveMouseFocusClick.
+func (cr *ClientRenderer) ConfigureMouseFocusClick(mode string) {
+	if cr == nil {
+		return
+	}
+	resolved, err := config.ResolveMouseFocusClick(mode)
+	if err != nil {
+		resolved = config.MouseFocusClickFocusOnly
+	}
+	cr.mouseFocusClickForward.Store(resolved == config.MouseFocusClickForward)
 }
 
 // NewClientRendererWithScrollback creates a client renderer with an explicit

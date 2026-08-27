@@ -44,6 +44,12 @@ type dragState struct {
 	PendingWordCopyPaneID uint32
 	PendingWordCopyAt     time.Time
 
+	// FocusClickSwallow is set when a button press on an inactive app-mouse
+	// pane was consumed as focus-only. The rest of that gesture (motion and
+	// the release) is swallowed so the app never receives an orphan release
+	// or a click it did not own. Cleared on release.
+	FocusClickSwallow bool
+
 	now       func() time.Time
 	afterFunc func(time.Duration, func()) dragTimer
 	dwell     *paneDragDwellState
@@ -483,10 +489,55 @@ func paneWantsMousePassthrough(cr *ClientRenderer, paneID uint32) bool {
 	return ok && interaction.MouseProtocol.Enabled()
 }
 
-func forwardMouseEventToApp(cr *ClientRenderer, sender *messageSender, layout *mux.LayoutCell, ev mouse.Event) bool {
+func isMouseButton(btn mouse.Button) bool {
+	switch btn {
+	case mouse.ButtonLeft, mouse.ButtonMiddle, mouse.ButtonRight:
+		return true
+	}
+	return false
+}
+
+// consumeSwallowedFocusGesture reports whether ev belongs to a gesture that
+// started as a focus-only click and must be dropped. Scroll events are never
+// part of such a gesture.
+func consumeSwallowedFocusGesture(drag *dragState, ev mouse.Event) bool {
+	if drag == nil || !drag.FocusClickSwallow {
+		return false
+	}
+	switch ev.Action {
+	case mouse.Release:
+		drag.FocusClickSwallow = false
+		return true
+	case mouse.Motion:
+		return true
+	case mouse.Press:
+		// A second button press mid-gesture (chorded click) stays swallowed;
+		// wheel presses are independent of the button gesture.
+		return isMouseButton(ev.Button)
+	}
+	return false
+}
+
+func forwardMouseEventToApp(cr *ClientRenderer, sender *messageSender, layout *mux.LayoutCell, drag *dragState, ev mouse.Event) bool {
+	if consumeSwallowedFocusGesture(drag, ev) {
+		return true
+	}
 	target := mouseTargetAt(layout, ev.X, ev.Y)
 	if target == nil || !paneWantsMousePassthrough(cr, target.paneID) {
 		return false
+	}
+	// Clicking an inactive pane only focuses it. The application asked for
+	// mouse reporting, but it did not own this click: the user is switching
+	// panes, not interacting with the app. Forwarding the SGR-encoded press
+	// lets TUIs (e.g. Claude Code) treat it as caret placement / accepting a
+	// suggestion, corrupting the prompt. See client.mouse_focus_click.
+	if ev.Action == mouse.Press && isMouseButton(ev.Button) && target.inContent &&
+		target.paneID != cr.ActivePaneID() && !cr.mouseFocusClickForward.Load() {
+		focusPane(sender, target.paneID, cr.ActivePaneID())
+		if drag != nil {
+			drag.FocusClickSwallow = true
+		}
+		return true
 	}
 	return forwardMouseToPane(cr, sender, target, ev)
 }
@@ -717,7 +768,7 @@ func handleMouseEvent(ev mouse.Event, cr *ClientRenderer, sender *messageSender,
 	if handleGlobalBarMouseEvent(ev, layout, cr, sender, drag, msgCh) {
 		return
 	}
-	if !drag.Active && !drag.PaneDragActive && forwardMouseEventToApp(cr, sender, layout, ev) {
+	if !drag.Active && !drag.PaneDragActive && forwardMouseEventToApp(cr, sender, layout, drag, ev) {
 		drag.Active = false
 		clearPaneDragState(cr, drag)
 		drag.CopyModeActive = false

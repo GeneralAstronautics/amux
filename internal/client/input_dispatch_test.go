@@ -2265,10 +2265,122 @@ func TestHandleMouseEventForwardsAppMouseClickToPane(t *testing.T) {
 	assertNoMessage(t, serverConn)
 }
 
-func TestHandleMouseEventAppMousePressFocusesInactivePaneBeforePassthrough(t *testing.T) {
+func TestHandleMouseEventAppMousePressOnInactivePaneFocusesOnly(t *testing.T) {
 	t.Parallel()
 
 	cr := buildTestRenderer(t)
+	cr.HandlePaneOutput(2, []byte("\x1b[?1000h\x1b[?1006h"))
+
+	clientConn, serverConn := net.Pipe()
+	t.Cleanup(func() {
+		clientConn.Close()
+		serverConn.Close()
+	})
+
+	sender := newMessageSender(clientConn)
+	t.Cleanup(sender.Close)
+
+	var drag dragState
+	x, y := paneCenterPoint(t, cr, 2)
+
+	pressDone := make(chan struct{}, 1)
+	go func() {
+		handleMouseEvent(mouse.Event{Action: mouse.Press, Button: mouse.ButtonLeft, X: x, Y: y}, cr, sender, &drag, nil)
+		pressDone <- struct{}{}
+	}()
+
+	focus := readCommandMessage(t, serverConn)
+	if focus.Type != proto.MsgTypeCommand || focus.CmdName != "focus" || len(focus.CmdArgs) != 1 || focus.CmdArgs[0] != "2" {
+		t.Fatalf("expected focus [2], got type=%d %q %v", focus.Type, focus.CmdName, focus.CmdArgs)
+	}
+	<-pressDone
+	// The press itself must NOT reach the pane's pty.
+	assertNoMessage(t, serverConn)
+	if !drag.FocusClickSwallow {
+		t.Fatal("focus-only press should mark the gesture as swallowed")
+	}
+	if drag.Active || drag.PaneDragActive || drag.CopyModeActive || drag.CopyModePaneID != 0 {
+		t.Fatalf("press should not start local mouse handling, got %+v", drag)
+	}
+
+	// Motion and release of the same gesture are swallowed too: the app must
+	// never see an orphan release.
+	handleMouseEvent(mouse.Event{Action: mouse.Motion, Button: mouse.ButtonLeft, X: x + 1, Y: y, LastX: x, LastY: y}, cr, sender, &drag, nil)
+	assertNoMessage(t, serverConn)
+	handleMouseEvent(mouse.Event{Action: mouse.Release, Button: mouse.ButtonLeft, X: x + 1, Y: y}, cr, sender, &drag, nil)
+	assertNoMessage(t, serverConn)
+	if drag.FocusClickSwallow {
+		t.Fatal("release should end the swallowed gesture")
+	}
+
+	// Scroll on the inactive pane is still delivered (it is not a focus click).
+	scrollDone := make(chan struct{}, 1)
+	go func() {
+		handleMouseEvent(mouse.Event{Action: mouse.Press, Button: mouse.ScrollDown, X: x, Y: y}, cr, sender, &drag, nil)
+		scrollDone <- struct{}{}
+	}()
+	// Scroll keeps the pre-existing behaviour: focus, then the wheel bytes.
+	scrollFocus := readCommandMessage(t, serverConn)
+	if scrollFocus.Type != proto.MsgTypeCommand || scrollFocus.CmdName != "focus" {
+		t.Fatalf("expected focus before scroll passthrough, got type=%d %q", scrollFocus.Type, scrollFocus.CmdName)
+	}
+	scroll := readCommandMessage(t, serverConn)
+	if scroll.Type != proto.MsgTypeInputPane || scroll.PaneID != 2 {
+		t.Fatalf("expected scroll to reach pane 2, got type=%d pane=%d", scroll.Type, scroll.PaneID)
+	}
+	<-scrollDone
+	assertNoMessage(t, serverConn)
+}
+
+func TestHandleMouseEventAppMousePressOnActivePaneStillForwards(t *testing.T) {
+	t.Parallel()
+
+	cr := buildTestRenderer(t)
+	cr.HandlePaneOutput(1, []byte("\x1b[?1000h\x1b[?1006h"))
+
+	clientConn, serverConn := net.Pipe()
+	t.Cleanup(func() {
+		clientConn.Close()
+		serverConn.Close()
+	})
+
+	sender := newMessageSender(clientConn)
+	t.Cleanup(sender.Close)
+
+	var drag dragState
+	x, y := paneCenterPoint(t, cr, 1)
+	target := mouseTargetAt(cr.VisibleLayout(), x, y)
+	if target == nil || target.paneID != 1 {
+		t.Fatal("expected pane-1 mouse target")
+	}
+	if cr.ActivePaneID() != 1 {
+		t.Fatalf("test layout should have pane 1 active, got %d", cr.ActivePaneID())
+	}
+
+	pressDone := make(chan struct{}, 1)
+	go func() {
+		handleMouseEvent(mouse.Event{Action: mouse.Press, Button: mouse.ButtonLeft, X: x, Y: y}, cr, sender, &drag, nil)
+		pressDone <- struct{}{}
+	}()
+	press := readCommandMessage(t, serverConn)
+	if press.Type != proto.MsgTypeInputPane || press.PaneID != 1 {
+		t.Fatalf("expected press forwarded to active pane 1, got type=%d pane=%d", press.Type, press.PaneID)
+	}
+	if got, want := string(press.PaneData), fmt.Sprintf("\x1b[<0;%d;%dM", target.localX+1, target.localY+1); got != want {
+		t.Fatalf("press pane data = %q, want %q", got, want)
+	}
+	<-pressDone
+	if drag.FocusClickSwallow {
+		t.Fatal("press on the active pane must not be swallowed")
+	}
+	assertNoMessage(t, serverConn)
+}
+
+func TestHandleMouseEventAppMousePressForwardModeKeepsLegacyPassthrough(t *testing.T) {
+	t.Parallel()
+
+	cr := buildTestRenderer(t)
+	cr.ConfigureMouseFocusClick(config.MouseFocusClickForward)
 	cr.HandlePaneOutput(2, []byte("\x1b[?1000h\x1b[?1006h"))
 
 	clientConn, serverConn := net.Pipe()
@@ -2289,56 +2401,35 @@ func TestHandleMouseEventAppMousePressFocusesInactivePaneBeforePassthrough(t *te
 
 	pressDone := make(chan struct{}, 1)
 	go func() {
-		handleMouseEvent(mouse.Event{
-			Action: mouse.Press,
-			Button: mouse.ButtonLeft,
-			X:      x,
-			Y:      y,
-		}, cr, sender, &drag, nil)
+		handleMouseEvent(mouse.Event{Action: mouse.Press, Button: mouse.ButtonLeft, X: x, Y: y}, cr, sender, &drag, nil)
 		pressDone <- struct{}{}
 	}()
 
 	focus := readCommandMessage(t, serverConn)
-	if focus.Type != proto.MsgTypeCommand {
-		t.Fatalf("focus message type = %d, want %d", focus.Type, proto.MsgTypeCommand)
+	if focus.Type != proto.MsgTypeCommand || focus.CmdName != "focus" || len(focus.CmdArgs) != 1 || focus.CmdArgs[0] != "2" {
+		t.Fatalf("expected focus [2], got type=%d %q %v", focus.Type, focus.CmdName, focus.CmdArgs)
 	}
-	if focus.CmdName != "focus" || len(focus.CmdArgs) != 1 || focus.CmdArgs[0] != "2" {
-		t.Fatalf("focus command = %q %v, want focus [2]", focus.CmdName, focus.CmdArgs)
-	}
-
 	press := readCommandMessage(t, serverConn)
-	if press.Type != proto.MsgTypeInputPane {
-		t.Fatalf("press message type = %d, want %d", press.Type, proto.MsgTypeInputPane)
+	if press.Type != proto.MsgTypeInputPane || press.PaneID != 2 {
+		t.Fatalf("expected press forwarded to pane 2, got type=%d pane=%d", press.Type, press.PaneID)
 	}
-	if press.PaneID != 2 {
-		t.Fatalf("press pane id = %d, want 2", press.PaneID)
-	}
-	if got := string(press.PaneData); got != fmt.Sprintf("\x1b[<0;%d;%dM", target.localX+1, target.localY+1) {
-		t.Fatalf("press pane data = %q, want %q", got, fmt.Sprintf("\x1b[<0;%d;%dM", target.localX+1, target.localY+1))
+	if got, want := string(press.PaneData), fmt.Sprintf("\x1b[<0;%d;%dM", target.localX+1, target.localY+1); got != want {
+		t.Fatalf("press pane data = %q, want %q", got, want)
 	}
 	<-pressDone
 	assertNoMessage(t, serverConn)
 
 	releaseDone := make(chan struct{}, 1)
 	go func() {
-		handleMouseEvent(mouse.Event{
-			Action: mouse.Release,
-			Button: mouse.ButtonLeft,
-			X:      x,
-			Y:      y,
-		}, cr, sender, &drag, nil)
+		handleMouseEvent(mouse.Event{Action: mouse.Release, Button: mouse.ButtonLeft, X: x, Y: y}, cr, sender, &drag, nil)
 		releaseDone <- struct{}{}
 	}()
-
 	release := readCommandMessage(t, serverConn)
-	if release.Type != proto.MsgTypeInputPane {
-		t.Fatalf("release message type = %d, want %d", release.Type, proto.MsgTypeInputPane)
+	if release.Type != proto.MsgTypeInputPane || release.PaneID != 2 {
+		t.Fatalf("expected release forwarded to pane 2, got type=%d pane=%d", release.Type, release.PaneID)
 	}
-	if release.PaneID != 2 {
-		t.Fatalf("release pane id = %d, want 2", release.PaneID)
-	}
-	if got := string(release.PaneData); got != fmt.Sprintf("\x1b[<0;%d;%dm", target.localX+1, target.localY+1) {
-		t.Fatalf("release pane data = %q, want %q", got, fmt.Sprintf("\x1b[<0;%d;%dm", target.localX+1, target.localY+1))
+	if got, want := string(release.PaneData), fmt.Sprintf("\x1b[<0;%d;%dm", target.localX+1, target.localY+1); got != want {
+		t.Fatalf("release pane data = %q, want %q", got, want)
 	}
 	<-releaseDone
 	assertNoMessage(t, serverConn)
