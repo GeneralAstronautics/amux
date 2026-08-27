@@ -210,11 +210,11 @@ func CloneLayout(root *LayoutCell) *LayoutCell {
 		return nil
 	}
 	clone := &LayoutCell{
-		X:      root.X,
-		Y:      root.Y,
-		W:      root.W,
-		H:      root.H,
-		Dir:    root.Dir,
+		X:        root.X,
+		Y:        root.Y,
+		W:        root.W,
+		H:        root.H,
+		Dir:      root.Dir,
 		Pane:     root.Pane,
 		PaneID:   root.PaneID,
 		isLeaf:   root.isLeaf,

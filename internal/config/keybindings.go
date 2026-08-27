@@ -65,10 +65,10 @@ func DefaultKeybindings() *Keybindings {
 			'd': {Action: "detach"},
 			'r': {Action: "reload"},
 			'P': {Action: "toggle-lead"},
-		// Ultra grid layout: toggle, and page through hidden agent slots.
-		'u': {Action: "layout", Args: []string{"toggle"}},
-		'>': {Action: "layout", Args: []string{"page", "next"}},
-		'<': {Action: "layout", Args: []string{"page", "prev"}},
+			// Ultra grid layout: toggle, and page through hidden agent slots.
+			'u': {Action: "layout", Args: []string{"toggle"}},
+			'>': {Action: "layout", Args: []string{"page", "next"}},
+			'<': {Action: "layout", Args: []string{"page", "prev"}},
 		},
 	}
 }

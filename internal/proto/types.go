@@ -69,8 +69,8 @@ type CellSnapshot struct {
 	W        int            `json:"w"`
 	H        int            `json:"h"`
 	IsLeaf   bool           `json:"is_leaf"`
-	Dir      int            `json:"dir"`     // -1 for leaf, 0 for SplitVertical, 1 for SplitHorizontal
-	PaneID   uint32         `json:"pane_id"` // only for leaves
+	Dir      int            `json:"dir"`                 // -1 for leaf, 0 for SplitVertical, 1 for SplitHorizontal
+	PaneID   uint32         `json:"pane_id"`             // only for leaves
 	Slot     int            `json:"slot,omitempty"`      // ultra: 1-based agent slot number (leaf may be empty)
 	LeadSlot bool           `json:"lead_slot,omitempty"` // ultra: reserved lead cell
 	Children []CellSnapshot `json:"children,omitempty"`
